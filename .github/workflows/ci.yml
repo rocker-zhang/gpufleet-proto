@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  buf:
+    name: buf lint / format / breaking
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so `buf breaking` can resolve the base branch.
+          fetch-depth: 0
+
+      - name: Install buf
+        uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: buf lint
+        run: buf lint
+
+      - name: buf format (diff must be empty)
+        run: buf format --diff --exit-code
+
+      - name: buf breaking (against main)
+        # On PRs, compare against the PR base. On pushes to main, compare
+        # against the previous commit so a bad merge is still caught.
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            buf breaking --against ".git#branch=origin/${{ github.base_ref }}"
+          else
+            buf breaking --against ".git#ref=HEAD~1"
+          fi
+
+      - name: buf build (sanity)
+        run: buf build

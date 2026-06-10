@@ -1,0 +1,17 @@
+# Generated code is NOT committed; modules vendor from a published/pinned tag
+# via buf or regenerate locally. Keep the repo to source-of-truth .proto only.
+/gen/
+
+# buf
+buf.lock
+
+# Editor / OS noise
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Local tooling
+/.cache/
+/tmp/

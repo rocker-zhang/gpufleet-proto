@@ -1,0 +1,106 @@
+// plugin.proto defines the OPEN probe/tool plugin protocol.
+//
+// A plugin is an out-of-process probe the open agent can invoke to collect an
+// additional class of evidence (e.g. a new exporter, a custom dmesg parser).
+// Plugins are read-only producers of EvidencePack fragments. They run
+// off-critical-path and MUST NOT control, orchestrate, or checkpoint GPUs.
+// This protocol is OPEN by design so third parties can add probes without
+// touching closed code.
+syntax = "proto3";
+
+package gpufleet.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "schema/gpufleet/v1/signal.proto";
+
+// PluginService is implemented by a probe plugin and called by the open agent.
+// It is intentionally minimal: describe yourself, collect a window, stay
+// healthy. No method may mutate fleet state.
+service PluginService {
+  // Describe returns static capabilities so the agent knows what this probe
+  // produces and which contract version it speaks.
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+
+  // Collect runs a single read-only collection over a bounded window and
+  // returns an EvidencePack fragment. It MUST be side-effect free.
+  rpc Collect(CollectRequest) returns (CollectResponse);
+
+  // Health is a cheap liveness/readiness probe.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// PluginCapability advertises one class of signal a plugin can emit, so the
+// agent can route and so the gate can reason about source independence.
+message PluginCapability {
+  // Signal source class this capability produces.
+  SignalSource source = 1;
+
+  // Stable capability id (producer-defined, unique within the plugin).
+  string capability_id = 2;
+
+  // Human-readable description.
+  string description = 3;
+}
+
+message DescribeRequest {}
+
+message DescribeResponse {
+  // Stable plugin name (e.g. "dcgm-exporter-probe").
+  string name = 1;
+
+  // Plugin implementation version (semver string).
+  string version = 2;
+
+  // Contract version of this proto the plugin was built against (e.g. "v1").
+  string contract_version = 3;
+
+  // What this plugin can collect.
+  repeated PluginCapability capabilities = 4;
+}
+
+message CollectRequest {
+  // Inclusive start of the requested collection window.
+  google.protobuf.Timestamp window_start = 1;
+
+  // Exclusive end of the requested collection window.
+  google.protobuf.Timestamp window_end = 2;
+
+  // Optional device scope; empty means "all devices this plugin sees".
+  repeated string device_uuids = 3;
+
+  // Hard deadline the plugin must respect to stay off the critical path.
+  google.protobuf.Duration deadline = 4;
+
+  // Opaque, plugin-specific configuration (e.g. exporter URL). The agent never
+  // interprets these; they are not heuristics.
+  map<string, string> options = 5;
+}
+
+message CollectResponse {
+  // The collected evidence fragment. The agent merges fragments from multiple
+  // plugins into a single EvidencePack. Producing a Verdict here is forbidden;
+  // plugins emit facts only.
+  EvidencePack evidence = 1;
+
+  // Non-fatal collection warnings (e.g. "scrape partially timed out").
+  repeated string warnings = 2;
+
+  // Whether the window was fully covered or truncated by the deadline.
+  bool partial = 3;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  ServingStatus status = 1;
+
+  // Optional detail for diagnostics.
+  string detail = 2;
+
+  enum ServingStatus {
+    SERVING_STATUS_UNSPECIFIED = 0;
+    SERVING_STATUS_SERVING = 1;
+    SERVING_STATUS_NOT_SERVING = 2;
+  }
+}

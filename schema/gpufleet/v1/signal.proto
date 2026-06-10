@@ -1,0 +1,199 @@
+// Package gpufleet.v1 defines the normalized evidence contract for gpufleet.
+//
+// signal.proto describes the EVIDENCE PACK: a bounded, normalized window of
+// signals collected read-only and off-critical-path by the open agent. The
+// evidence pack is the ONLY payload the open agent sends to the closed
+// controlplane. It MUST NOT carry prompts, playbooks, heuristics, thresholds,
+// or any adjudication logic -- only observed facts with provenance.
+syntax = "proto3";
+
+package gpufleet.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// EvidencePack is a self-contained, deterministic window of observed signals
+// for a single device/job scope over a bounded time range. It is the request
+// payload for deep RCA. It is append-only in spirit: collectors add facts,
+// never verdicts.
+message EvidencePack {
+  // Schema/contract version this pack was produced against (e.g. "v1").
+  // Used by the controlplane to reject incompatible producers.
+  string contract_version = 1;
+
+  // Stable identifier for the collecting agent instance (for provenance).
+  string agent_id = 2;
+
+  // Inclusive start of the observation window.
+  google.protobuf.Timestamp window_start = 3;
+
+  // Exclusive end of the observation window.
+  google.protobuf.Timestamp window_end = 4;
+
+  // Device <-> job topology valid for this window.
+  repeated DeviceJobMapping mappings = 5;
+
+  // Time-series DCGM field samples observed in the window.
+  repeated DcgmFieldSeries dcgm_series = 6;
+
+  // Discrete XID / kernel (dmesg) events observed in the window.
+  repeated XidEvent xid_events = 7;
+
+  // Discrete NCCL collective/communication events observed in the window.
+  repeated NcclEvent nccl_events = 8;
+
+  // Ordered, heterogeneous timeline of point-in-time observations. This is the
+  // canonical ordering used for straggler / correlation analysis.
+  repeated TimelineEntry timeline = 9;
+
+  // Free-form, non-adjudicating collection provenance (hostnames, exporter
+  // versions, scrape intervals). Keys are collector-defined and opaque.
+  map<string, string> provenance = 10;
+}
+
+// DeviceJobMapping ties a physical GPU to the workload occupying it during the
+// window. This mapping is the adoption wedge: cost/efficiency attribution is
+// impossible without it.
+message DeviceJobMapping {
+  // Canonical device identity (UUID preferred over index, which is unstable).
+  string device_uuid = 1;
+
+  // Node-local PCI / minor index, best-effort, for cross-referencing exporters.
+  uint32 device_index = 2;
+
+  // Hostname / node the device resides on.
+  string node = 3;
+
+  // Scheduler job identifier (Slurm/K8s/internal), opaque to the engine.
+  string job_id = 4;
+
+  // Logical rank within a distributed job, if known (-1 unknown encoded as 0
+  // with rank_known=false to keep proto3 defaults sane).
+  uint32 rank = 5;
+
+  // Whether rank is meaningful for this mapping.
+  bool rank_known = 6;
+
+  // Advertised peak throughput for MFU math, in FP16/BF16 TFLOP/s. Zero means
+  // unknown; the engine MUST treat unknown as "cannot compute MFU", not zero.
+  double peak_tflops = 7;
+
+  // Hourly $ cost rate attributed to this device for cost attribution. Zero
+  // means unpriced; the engine MUST NOT fabricate a cost.
+  double cost_rate_usd_per_hour = 8;
+}
+
+// DcgmFieldSeries is a single DCGM field id sampled over time for one device.
+// Values are kept raw; semantics (MFU, tensor-active fraction) are derived
+// downstream in the semantics library, never here.
+message DcgmFieldSeries {
+  // Device this series belongs to.
+  string device_uuid = 1;
+
+  // DCGM field identifier (e.g. DCGM_FI_PROF_PIPE_TENSOR_ACTIVE). Carried as a
+  // string symbol AND numeric id so consumers need no DCGM headers.
+  string field_symbol = 2;
+
+  // Numeric DCGM field id.
+  uint32 field_id = 3;
+
+  // Engineering unit of the samples (e.g. "ratio", "W", "C", "MHz").
+  string unit = 4;
+
+  // Time-aligned samples. sample[i].ts and sample[i].value are paired.
+  repeated Sample samples = 5;
+}
+
+// Sample is one timestamped scalar observation.
+message Sample {
+  google.protobuf.Timestamp ts = 1;
+  double value = 2;
+}
+
+// XidEvent is a discrete GPU/kernel fault event (NVIDIA XID or dmesg line).
+// Note: NO closed/externally-sourced error-code semantics may be embedded; only
+// the publicly documented XID number and the raw text are carried.
+message XidEvent {
+  google.protobuf.Timestamp ts = 1;
+
+  // Device the event was attributed to (may be empty if node-scoped).
+  string device_uuid = 2;
+
+  // Public NVIDIA XID number (e.g. 79, 48). Zero if not an XID.
+  uint32 xid = 3;
+
+  // Raw kernel/dmesg message text as observed (verbatim, untransformed).
+  string raw_message = 4;
+
+  // Kernel facility/severity if parseable (e.g. "err", "warn"). Opaque.
+  string severity = 5;
+}
+
+// NcclEvent captures a collective communication observation relevant to
+// straggler / hang detection (timeouts, slow all-reduce, rank desync).
+message NcclEvent {
+  google.protobuf.Timestamp ts = 1;
+
+  // Communicator scope.
+  string communicator_id = 2;
+
+  // Rank reporting the event.
+  uint32 rank = 3;
+
+  // Collective operation name (e.g. "AllReduce", "Broadcast"). Opaque string.
+  string op = 4;
+
+  // Event kind classification at the wire level only (not a fault verdict).
+  NcclEventKind kind = 5;
+
+  // Observed duration in microseconds for the operation, if measured.
+  uint64 duration_us = 6;
+
+  // Raw NCCL log line as observed.
+  string raw_message = 7;
+}
+
+// NcclEventKind is a low-level, observation-only classification. It is NOT a
+// fault class; it is a fact about the wire.
+enum NcclEventKind {
+  NCCL_EVENT_KIND_UNSPECIFIED = 0;
+  NCCL_EVENT_KIND_OP_COMPLETED = 1;
+  NCCL_EVENT_KIND_OP_TIMEOUT = 2;
+  NCCL_EVENT_KIND_OP_SLOW = 3;
+  NCCL_EVENT_KIND_RANK_DESYNC = 4;
+  NCCL_EVENT_KIND_INIT = 5;
+}
+
+// TimelineEntry is a normalized, ordered reference into the heterogeneous
+// observations so downstream analysis has one canonical sequence to walk.
+message TimelineEntry {
+  google.protobuf.Timestamp ts = 1;
+
+  // What kind of observation this entry points at.
+  SignalSource source = 2;
+
+  // Device scope, if applicable.
+  string device_uuid = 3;
+
+  // Job scope, if applicable.
+  string job_id = 4;
+
+  // Stable id of a citable signal, referenced by Verdict.cited_signal.
+  // Format is producer-defined but MUST be stable within one EvidencePack.
+  string signal_id = 5;
+
+  // Short human-readable label (non-adjudicating).
+  string label = 6;
+}
+
+// SignalSource enumerates the provenance class of a signal for citation and
+// for the >=2 INDEPENDENT corroborating-signal gate. Independence is judged on
+// source: two facts from the same source do not corroborate.
+enum SignalSource {
+  SIGNAL_SOURCE_UNSPECIFIED = 0;
+  SIGNAL_SOURCE_DCGM = 1;
+  SIGNAL_SOURCE_DMESG_XID = 2;
+  SIGNAL_SOURCE_NCCL = 3;
+  SIGNAL_SOURCE_PROMETHEUS = 4;
+  SIGNAL_SOURCE_SCHEDULER = 5;
+  SIGNAL_SOURCE_PROC = 6;
+}

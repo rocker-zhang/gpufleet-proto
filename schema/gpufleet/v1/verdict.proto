@@ -1,0 +1,128 @@
+// verdict.proto defines the RCA RESPONSE contract.
+//
+// A Verdict is the ONLY thing the closed controlplane returns to the open
+// agent. The deterministic gate decides fault_class (requiring >=2 independent
+// corroborating cited_signals) or ABSTAIN; the LLM only fills `narration`.
+// `narration` is descriptive prose and is NEVER the source of truth for
+// fault_class, confidence, or cited_signals.
+syntax = "proto3";
+
+package gpufleet.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// FaultClass is the closed, deterministic set of adjudicated outcomes. The
+// engine MUST emit FAULT_CLASS_ABSTAIN unless the >=2-independent-signal gate
+// is satisfied. The numbered classes are the 8-12 deterministic failure
+// classes; reserved range leaves room without breaking wire compat.
+enum FaultClass {
+  // Default / gate-not-satisfied. Treated as ABSTAIN. The zero value is
+  // intentionally the safe, non-committal outcome.
+  FAULT_CLASS_UNSPECIFIED = 0;
+
+  // Explicit abstention: insufficient independent corroboration. Distinct from
+  // UNSPECIFIED so producers can assert "we looked and declined to adjudicate".
+  FAULT_CLASS_ABSTAIN = 1;
+
+  // GPU fell off the bus / lost (e.g. XID 79).
+  FAULT_CLASS_GPU_FALLEN_OFF_BUS = 2;
+
+  // Uncorrectable ECC / memory error.
+  FAULT_CLASS_ECC_UNCORRECTABLE = 3;
+
+  // Thermal throttling / overheat-induced slowdown.
+  FAULT_CLASS_THERMAL_THROTTLE = 4;
+
+  // Power capping / power-supply-induced slowdown.
+  FAULT_CLASS_POWER_THROTTLE = 5;
+
+  // NCCL collective timeout / communication hang.
+  FAULT_CLASS_NCCL_TIMEOUT = 6;
+
+  // Straggler rank dragging a distributed job (no hard fault).
+  FAULT_CLASS_STRAGGLER = 7;
+
+  // Out-of-memory kill (process/cgroup OOM).
+  FAULT_CLASS_OOM_KILL = 8;
+
+  // Persistent low utilization / idle-burn (cost-efficiency fault).
+  FAULT_CLASS_LOW_UTILIZATION = 9;
+
+  // Driver/kernel Xid indicating fatal app error not classifiable above.
+  FAULT_CLASS_XID_FATAL = 10;
+
+  // PCIe/NVLink link degradation.
+  FAULT_CLASS_LINK_DEGRADED = 11;
+
+  // Reserved for future deterministic classes. DO NOT reuse these numbers for
+  // unrelated meanings; that would be a wire-breaking change.
+  reserved 12 to 31;
+}
+
+// CitedSignal is a verifiable reference back into the EvidencePack timeline.
+// Every adjudicated Verdict MUST cite the signals that satisfied the gate;
+// evidence_grounding requires each cited_signal to resolve to a real
+// TimelineEntry.signal_id. ABSTAIN may cite signals it considered.
+message CitedSignal {
+  // Must match a TimelineEntry.signal_id from the request EvidencePack.
+  string signal_id = 1;
+
+  // The independence class of this signal, copied from the source for the
+  // gate. Two cited signals corroborate only if their sources differ.
+  SignalSource source = 2;
+
+  // Timestamp of the cited observation (denormalized for self-containment).
+  google.protobuf.Timestamp ts = 3;
+
+  // Short human-readable reason this signal was cited (non-adjudicating).
+  string note = 4;
+}
+
+// CostImpact is the deterministic $ attribution for the window, derived in the
+// closed engine from DeviceJobMapping cost rates. Absent/zero means "could not
+// be computed", never "free".
+message CostImpact {
+  // Whether a cost could be computed at all (mappings were priced).
+  bool computed = 1;
+
+  // Wasted/at-risk spend attributed to this fault over the window, in USD.
+  double usd_window = 2;
+
+  // Extrapolated USD/hour burn rate if the condition persists.
+  double usd_per_hour = 3;
+
+  // Optional human-readable basis (e.g. "4 GPUs idle x $2.50/hr x 0.5h").
+  string basis = 4;
+}
+
+// Verdict is the RCA response. Field semantics are load-bearing: an open
+// consumer reads ONLY this and never sees the playbook or the prompt.
+message Verdict {
+  // Schema/contract version this verdict conforms to.
+  string contract_version = 1;
+
+  // The adjudicated outcome. ABSTAIN/UNSPECIFIED unless the gate passed.
+  FaultClass fault_class = 2;
+
+  // Deterministic confidence in [0,1]. For ABSTAIN this is the confidence in
+  // abstaining (i.e. that evidence was genuinely insufficient).
+  double confidence = 3;
+
+  // Signals that satisfied (or were considered by) the gate. For an
+  // adjudicated, non-abstain verdict there MUST be >=2 with distinct sources.
+  repeated CitedSignal cited_signals = 4;
+
+  // LLM-authored, human-facing prose. NARRATION ONLY. MUST NOT be parsed to
+  // recover fault_class/confidence. May be empty.
+  string narration = 5;
+
+  // Deterministic cost attribution for the window.
+  CostImpact cost_impact = 6;
+
+  // Identifier of the deterministic playbook/signature that fired, for audit.
+  // Empty on ABSTAIN.
+  string playbook_id = 7;
+
+  // When this verdict was produced.
+  google.protobuf.Timestamp produced_at = 8;
+}
