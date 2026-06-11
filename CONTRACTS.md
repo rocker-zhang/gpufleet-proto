@@ -37,6 +37,54 @@ Reserved ranges (e.g. `FaultClass` reserves `12..31`) exist precisely so future
 additive growth does not collide with old wire values. Never reuse a number for
 an unrelated meaning.
 
+## 2a. The PluginProto capability contract (D-0011)
+
+`plugin.proto` hosts the **OPEN collection-capability contract**. It is the
+declarative interface by which the closed controlplane drives deeper on-node
+collection **without ever shipping code or playbooks**:
+
+- **`CapabilityDescriptor` `{ id, tier, source, params_schema_ref,
+  resource_budget, description, version }`** — one entry in the agent's FIXED,
+  OPEN, SIGNED, vetted catalog. The controlplane addresses a capability by `id`
+  only; the implementation lives in the open agent and is customer-auditable.
+- **`CollectDirective` `{ capability_id, params, budget, window, device_uuids }`**
+  — the DECLARATIVE instruction the controlplane returns over the agent's
+  outbound HTTPS. It carries no code, no playbook, no threshold, no heuristic.
+- **`ResourceBudget` `{ max_duration, max_cpu_millicores, max_map_entries,
+  max_samples }`** + **`ConsentTier` `{ UNPRIVILEGED (Tier-0),
+  PRIVILEGED (Tier-1) }`** — the resource-guard / kill-switch and consent model.
+  The agent is the **sole policy enforcer**: it allowlists `capability_id`,
+  refuses any tier the customer has not enabled, and clamps every directive to
+  the capability's advertised budget.
+- **`PluginService` `Describe` / `Collect` / `Health`** is unchanged in shape:
+  `Describe` advertises the `catalog` (the discovery handshake), `Collect`
+  executes one validated directive read-only, `Health` is liveness. New
+  capabilities ship only via **new OPEN agent releases**; the controlplane
+  discovers them through `Describe`.
+
+Hard line: the directive flow is response-side only — the agent ALWAYS initiates
+outbound, ZERO inbound to the node. The moat (what-to-collect + how-to-interpret)
+stays server-side; nodes hold only generic auditable collectors.
+
+## 2b. The shared gate / signature schema
+
+The deterministic-gate vocabulary is defined **once** here and shared
+identically by the open `rca` library and the closed controlplane — there is one
+gate schema, not two:
+
+- **`SignalSource`** (in `signal.proto`) is the independence class. The
+  >=2-corroborating-signal gate is judged on **source**: two facts from the same
+  source do not corroborate. `CapabilityDescriptor.source`,
+  `TimelineEntry.source`, and `CitedSignal.source` all reference this one enum.
+- **`FaultClass`** (in `verdict.proto`) is the closed deterministic outcome set
+  (8–12 classes), with `FAULT_CLASS_UNSPECIFIED`/`FAULT_CLASS_ABSTAIN` as the
+  safe defaults and `reserved 12..31` for additive growth.
+- **`CitedSignal`** anchors each adjudication to a real `TimelineEntry.signal_id`
+  for evidence-grounding.
+
+A change to any of these is a shared-schema change affecting both the open gate
+and the closed engine and MUST be reviewed as such.
+
 ## 3. Contract-change-proposal process
 
 1. A module session that needs a contract change **ABSTAINS** and files a

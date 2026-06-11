@@ -1,11 +1,26 @@
-// plugin.proto defines the OPEN probe/tool plugin protocol.
+// plugin.proto defines the OPEN probe/tool plugin protocol AND the OPEN
+// collection-capability contract (D-0011).
 //
-// A plugin is an out-of-process probe the open agent can invoke to collect an
-// additional class of evidence (e.g. a new exporter, a custom dmesg parser).
-// Plugins are read-only producers of EvidencePack fragments. They run
-// off-critical-path and MUST NOT control, orchestrate, or checkpoint GPUs.
-// This protocol is OPEN by design so third parties can add probes without
-// touching closed code.
+// A plugin is an in-process collector the open agent can invoke to collect an
+// additional class of evidence (e.g. a new exporter, a custom dmesg parser, a
+// read-only eBPF observer). Plugins are read-only producers of EvidencePack
+// fragments. They run off-critical-path and MUST NOT control, orchestrate, or
+// checkpoint GPUs. This protocol is OPEN by design so third parties can audit
+// every probe in the agent's source.
+//
+// D-0011 capability model: the closed controlplane NEVER pushes code or
+// playbooks. It selects from the agent's FIXED, OPEN, SIGNED, vetted capability
+// catalog by sending a declarative CollectDirective that names a
+// CapabilityDescriptor by id. Describe advertises the catalog (handshake); the
+// directive rides in the controlplane's RESPONSE to the agent's outbound HTTPS
+// (zero inbound to the node). Consent tiers + resource budgets are enforced by
+// the agent, the sole policy enforcer.
+//
+// Shared schema note: the gate's independence class (SignalSource) and the
+// citable-signal/fault-class adjudication schema live in signal.proto /
+// verdict.proto and are SHARED across the open rca library and the closed
+// controlplane — this file references SignalSource for routing/independence and
+// adds no adjudication logic of its own.
 syntax = "proto3";
 
 package gpufleet.v1;
@@ -14,24 +29,125 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "schema/gpufleet/v1/signal.proto";
 
-// PluginService is implemented by a probe plugin and called by the open agent.
-// It is intentionally minimal: describe yourself, collect a window, stay
-// healthy. No method may mutate fleet state.
+// PluginService is implemented by a collector plugin and called by the open
+// agent. It is intentionally minimal: describe your capability catalog, collect
+// a directive's worth of evidence, stay healthy. No method may mutate fleet
+// state. The agent (not the controlplane) is the sole caller and policy
+// enforcer.
 service PluginService {
-  // Describe returns static capabilities so the agent knows what this probe
-  // produces and which contract version it speaks.
+  // Describe returns the plugin's static, OPEN capability catalog so the agent
+  // — and, via the agent's handshake, the controlplane — learns what this
+  // build can collect and which contract version it speaks. New capabilities
+  // appear only through new OPEN agent releases (D-0011).
   rpc Describe(DescribeRequest) returns (DescribeResponse);
 
-  // Collect runs a single read-only collection over a bounded window and
-  // returns an EvidencePack fragment. It MUST be side-effect free.
+  // Collect executes ONE declarative CollectDirective: a read-only collection
+  // for a named capability over a bounded window, within its resource budget.
+  // It MUST be side-effect free and produce facts only, never a Verdict.
   rpc Collect(CollectRequest) returns (CollectResponse);
 
   // Health is a cheap liveness/readiness probe.
   rpc Health(HealthRequest) returns (HealthResponse);
 }
 
+// ConsentTier is the privilege class a capability requires. The agent refuses
+// any directive whose capability tier the customer has not explicitly enabled,
+// and the controlplane can only request a tier the customer turned on (D-0011).
+enum ConsentTier {
+  CONSENT_TIER_UNSPECIFIED = 0;
+
+  // Tier-0: unprivileged default collectors (DCGM / Prometheus query / dmesg).
+  // Enabled out of the box.
+  CONSENT_TIER_UNPRIVILEGED = 1;
+
+  // Tier-1: needs CAP_BPF / CAP_PERFMON (read-only eBPF / perf observers).
+  // Requires explicit customer opt-in; never on by default.
+  CONSENT_TIER_PRIVILEGED = 2;
+}
+
+// ResourceBudget bounds a single collection so a probe can never stall a node.
+// Every collector carries a budget and a kill-switch / auto-detach guard
+// derived from it (D-0011 resource guards).
+message ResourceBudget {
+  // Hard wall-clock cap for the collection; on expiry the agent auto-detaches.
+  google.protobuf.Duration max_duration = 1;
+
+  // Soft CPU ceiling for the probe, in millicores (0 = collector default cap).
+  uint32 max_cpu_millicores = 2;
+
+  // Cap on in-kernel/eBPF map entries the probe may allocate (0 = N/A).
+  uint32 max_map_entries = 3;
+
+  // Max samples/events the probe may emit before it must stop (0 = collector
+  // default cap). Bounds output size off the critical path.
+  uint32 max_samples = 4;
+}
+
+// CapabilityDescriptor advertises ONE vetted, signed collector in the agent's
+// fixed OPEN catalog. The controlplane selects a capability by `id`; it never
+// ships the implementation. This is the unit a CollectDirective references.
+message CapabilityDescriptor {
+  // Stable, globally unique capability id (e.g. "dcgm.prof.tensor_active",
+  // "ebpf.nvlink.retrans"). The controlplane addresses this id declaratively.
+  string id = 1;
+
+  // Privilege class required to run this capability.
+  ConsentTier tier = 2;
+
+  // Signal source class this capability produces, for routing and for the
+  // gate's >=2-INDEPENDENT-source reasoning. Independence is judged on source.
+  SignalSource source = 3;
+
+  // Reference (URL or registry key) to the OPEN JSON-schema describing this
+  // capability's accepted `params`. The agent validates a directive's params
+  // against this schema; the wire stays generic (params is a string map).
+  string params_schema_ref = 4;
+
+  // Default/maximum resource budget the agent will permit for this capability.
+  // A directive may request <= this; never more.
+  ResourceBudget resource_budget = 5;
+
+  // Human-readable description (non-adjudicating).
+  string description = 6;
+
+  // Implementation version of this collector (semver), for audit/signing.
+  string version = 7;
+}
+
+// CollectDirective is the DECLARATIVE instruction the controlplane sends (in
+// its HTTPS response) and the agent validates and executes. It names a
+// capability and supplies params + a requested budget. It carries NO code, NO
+// playbook, NO threshold, NO heuristic — only "collect capability X with params
+// Y under budget Z" (D-0011).
+message CollectDirective {
+  // Must match a CapabilityDescriptor.id advertised by this agent build. The
+  // agent rejects any unknown id (allowlist) or any tier the customer has not
+  // enabled (consent gate).
+  string capability_id = 1;
+
+  // Opaque, capability-specific params validated by the agent against the
+  // capability's params_schema_ref. The agent never interprets these as
+  // heuristics; they parameterize a fixed collector only.
+  map<string, string> params = 2;
+
+  // Requested budget for this run; the agent clamps it to the capability's
+  // advertised ResourceBudget and enforces the kill-switch.
+  ResourceBudget budget = 3;
+
+  // Inclusive start of the requested collection window.
+  google.protobuf.Timestamp window_start = 4;
+
+  // Exclusive end of the requested collection window.
+  google.protobuf.Timestamp window_end = 5;
+
+  // Optional device scope; empty means "all devices this capability sees".
+  repeated string device_uuids = 6;
+}
+
 // PluginCapability advertises one class of signal a plugin can emit, so the
 // agent can route and so the gate can reason about source independence.
+// Retained for back-compat; new builds SHOULD populate `capabilities` with
+// richer CapabilityDescriptors as well.
 message PluginCapability {
   // Signal source class this capability produces.
   SignalSource source = 1;
@@ -55,8 +171,14 @@ message DescribeResponse {
   // Contract version of this proto the plugin was built against (e.g. "v1").
   string contract_version = 3;
 
-  // What this plugin can collect.
+  // Legacy capability list (source + id + description). Retained for
+  // back-compat; prefer `catalog` for the D-0011 capability model.
   repeated PluginCapability capabilities = 4;
+
+  // The OPEN, vetted capability catalog this agent build exposes. The
+  // controlplane discovers what-to-collect through this handshake and may then
+  // address any descriptor by id via a CollectDirective.
+  repeated CapabilityDescriptor catalog = 5;
 }
 
 message CollectRequest {
@@ -75,6 +197,12 @@ message CollectRequest {
   // Opaque, plugin-specific configuration (e.g. exporter URL). The agent never
   // interprets these; they are not heuristics.
   map<string, string> options = 5;
+
+  // D-0011 declarative directive: the validated capability + params + budget
+  // the agent decided to run for this collection. When set, this is the
+  // authoritative instruction and SUPERSEDES the legacy window/options fields
+  // above. The directive's capability_id MUST be in this plugin's catalog.
+  CollectDirective directive = 6;
 }
 
 message CollectResponse {
