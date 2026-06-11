@@ -54,7 +54,10 @@ Inherits `../RULES.md`. Module-specific hard lines:
    narration-only; `CollectDirective` is declarative (capability id + params +
    budget) and carries NO code/playbook; only public XID numbers + raw verbatim
    text (no proprietary/closed error-code semantics).
-5. **Generated code is not committed** (`gen/` is gitignored).
+5. **Generated code is derived, never hand-edited** (regenerate via `make gen`).
+   `gen/go` IS committed (Go consumers vendor it read-only at the tag via
+   `go.mod`); `gen/python` stays gitignored. The `.proto` files are the sole
+   source of truth — see `CONTRACTS.md §5`.
 6. **Open, never imports closed content.** The closed controlplane `api/` proto
    is separate and never shares history with this repo.
 

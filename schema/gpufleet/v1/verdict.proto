@@ -10,6 +10,7 @@ syntax = "proto3";
 package gpufleet.v1;
 
 import "google/protobuf/timestamp.proto";
+import "gpufleet/v1/signal.proto";
 
 // FaultClass is the closed, deterministic set of adjudicated outcomes. The
 // engine MUST emit FAULT_CLASS_ABSTAIN unless the >=2-independent-signal gate
@@ -57,6 +58,55 @@ enum FaultClass {
   // Reserved for future deterministic classes. DO NOT reuse these numbers for
   // unrelated meanings; that would be a wire-breaking change.
   reserved 12 to 31;
+}
+
+// GateSignature is the VERSIONED SIGNATURE-ID REGISTRY of the deterministic
+// gate. It is the single shared source — the open `rca` library (which runs the
+// gate) and the closed controlplane (which reuses the SAME gate) both reference
+// these ids; neither hard-codes its own signature strings (D-0008, TASK-0021).
+//
+// A signature is the named deterministic rule that fired to reach a FaultClass
+// (e.g. "XID79 + DCGM pcie-down → GPU_FALLEN_OFF_BUS"). It is audit metadata,
+// NOT adjudication input: the class is decided by the >=2-independent-signal
+// gate over cited_signals, and `signature` records WHICH rule matched. This
+// registry carries NO thresholds, NO heuristics, NO playbook text — only a
+// stable id ⇄ number mapping, kept additive-only under buf-breaking control
+// exactly like FaultClass.
+enum GateSignature {
+  // No signature (ABSTAIN, or a producer that did not record one). Safe zero.
+  GATE_SIGNATURE_UNSPECIFIED = 0;
+
+  // XID 79 (GPU fallen off bus) corroborated by a second independent source.
+  GATE_SIGNATURE_XID79_FALLEN_OFF_BUS = 1;
+
+  // Uncorrectable ECC corroborated across sources.
+  GATE_SIGNATURE_ECC_UNCORRECTABLE = 2;
+
+  // NCCL collective timeout corroborated by a second independent source.
+  GATE_SIGNATURE_NCCL_TIMEOUT = 3;
+
+  // Straggler rank dragging a distributed job.
+  GATE_SIGNATURE_STRAGGLER = 4;
+
+  // OOM kill corroborated across sources.
+  GATE_SIGNATURE_OOM_KILL = 5;
+
+  // Persistent low utilization / idle-burn (cost-efficiency signature).
+  GATE_SIGNATURE_LOW_UTILIZATION = 6;
+
+  // Thermal throttling corroborated across sources.
+  GATE_SIGNATURE_THERMAL_THROTTLE = 7;
+
+  // Power capping / power-supply slowdown corroborated across sources.
+  GATE_SIGNATURE_POWER_THROTTLE = 8;
+
+  // PCIe/NVLink link degradation corroborated across sources.
+  GATE_SIGNATURE_LINK_DEGRADED = 9;
+
+  // Reserved for future deterministic signatures. DO NOT reuse these numbers
+  // for unrelated meanings; that would be a wire-breaking change. New rules
+  // append a new value at the END (additive minor tag), never renumber.
+  reserved 10 to 63;
 }
 
 // CitedSignal is a verifiable reference back into the EvidencePack timeline.
@@ -119,10 +169,18 @@ message Verdict {
   // Deterministic cost attribution for the window.
   CostImpact cost_impact = 6;
 
-  // Identifier of the deterministic playbook/signature that fired, for audit.
-  // Empty on ABSTAIN.
+  // Free-form identifier of the deterministic playbook that fired, for audit.
+  // Empty on ABSTAIN. Retained for back-compat; prefer the versioned
+  // `signature` registry value below for the open↔closed shared gate id.
   string playbook_id = 7;
 
   // When this verdict was produced.
   google.protobuf.Timestamp produced_at = 8;
+
+  // Versioned gate signature id from the SHARED registry (GateSignature). This
+  // is the canonical, buf-managed id that both the open rca gate and the closed
+  // controlplane agree on; GATE_SIGNATURE_UNSPECIFIED on ABSTAIN. It is audit
+  // metadata only and is NEVER an input to the class decision (the gate decides
+  // FaultClass from cited_signals).
+  GateSignature signature = 9;
 }

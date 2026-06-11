@@ -66,24 +66,41 @@ Hard line: the directive flow is response-side only — the agent ALWAYS initiat
 outbound, ZERO inbound to the node. The moat (what-to-collect + how-to-interpret)
 stays server-side; nodes hold only generic auditable collectors.
 
-## 2b. The shared gate / signature schema
+## 2b. The shared gate / signature schema (`GateClassSchema`)
 
-The deterministic-gate vocabulary is defined **once** here and shared
-identically by the open `rca` library and the closed controlplane — there is one
-gate schema, not two:
+The deterministic-gate vocabulary — collectively the **`GateClassSchema`** — is
+defined **once** here and shared identically by the open `rca` library and the
+closed controlplane. There is **one gate schema, not two**: both sides vendor
+these types at the same proto tag and **neither hard-codes its own copy**
+(D-0008, TASK-0021). The schema is the three enums + one citation message below,
+all under `buf breaking` control (additive-only within `v1`):
 
-- **`SignalSource`** (in `signal.proto`) is the independence class. The
+- **`SignalSource`** (in `signal.proto`) is the **independence class**. The
   >=2-corroborating-signal gate is judged on **source**: two facts from the same
   source do not corroborate. `CapabilityDescriptor.source`,
   `TimelineEntry.source`, and `CitedSignal.source` all reference this one enum.
-- **`FaultClass`** (in `verdict.proto`) is the closed deterministic outcome set
-  (8–12 classes), with `FAULT_CLASS_UNSPECIFIED`/`FAULT_CLASS_ABSTAIN` as the
-  safe defaults and `reserved 12..31` for additive growth.
+- **`FaultClass`** (in `verdict.proto`) is the closed deterministic **outcome
+  set** (8–12 classes), with `FAULT_CLASS_UNSPECIFIED`/`FAULT_CLASS_ABSTAIN` as
+  the safe defaults and `reserved 12..31` for additive growth.
+- **`GateSignature`** (in `verdict.proto`) is the **versioned signature-ID
+  registry**: the stable id ⇄ number mapping for the named deterministic rule
+  that fired (e.g. `GATE_SIGNATURE_XID79_FALLEN_OFF_BUS`). It is **audit
+  metadata only**, never an input to the class decision — the class is decided
+  by the gate over `cited_signals`, and `Verdict.signature` records *which* rule
+  matched. It carries **no thresholds, no heuristics, no playbook text**; only
+  the id mapping is shared, the rule *implementation* stays in `rca`/closed.
+  `GATE_SIGNATURE_UNSPECIFIED` is the safe zero (ABSTAIN); `reserved 10..63`
+  leaves room for additive growth. New signatures **append at the end** (minor
+  tag); never renumber/repurpose (that is a `v2` break).
 - **`CitedSignal`** anchors each adjudication to a real `TimelineEntry.signal_id`
   for evidence-grounding.
 
-A change to any of these is a shared-schema change affecting both the open gate
-and the closed engine and MUST be reviewed as such.
+The single shared source for these types is **this repo's `gpufleet.v1`**:
+the open `rca` gate consumes them from `gen/go` at the pinned tag, and the
+closed controlplane reuses the SAME generated types — it does not redefine
+`FaultClass`/`GateSignature` in its separate closed `api/` proto. A change to
+any member of `GateClassSchema` is a **shared-schema change** affecting both the
+open gate and the closed engine and MUST be reviewed as such.
 
 ## 3. Contract-change-proposal process
 
@@ -123,12 +140,28 @@ May add this repo as a buf dependency pinned to a tag in their own `buf.yaml`
 
 ## 5. Codegen
 
-`buf.gen.yaml` emits:
-- **Go** → `gen/go` (protocolbuffers/go + grpc/go, `paths=source_relative`).
+`make gen` (= `buf generate`, see `Makefile`) emits, with the single managed
+`go_package` prefix **`github.com/rocker-zhang/gpufleet-proto/gen/go`**:
+- **Go** → `gen/go` (protocolbuffers/go + grpc/go, `paths=source_relative`),
+  packaged as a self-contained Go module (`gen/go/go.mod`).
 - **Python** → `gen/python` (protocolbuffers/python + pyi + grpc/python).
 
-Generated code is **gitignored**; it is produced at publish/build time, never
-committed, so the source of truth stays the `.proto` files alone.
+Codegen policy (split, because Go and Python consumers vendor differently):
+- **`gen/go` IS committed** and carried on the tagged tree. Go consumers
+  (`semantics`/`agent`/`rca`/`cli`) vendor it read-only via `go.mod` at the
+  proto tag (see §4) — so the tag must contain compiled-clean Go. It is
+  **generated, not hand-edited**; regenerate with `make gen` after any `.proto`
+  change. `make gen` also runs `go build ./...` + `go vet ./...` on `gen/go`.
+- **`gen/python` stays gitignored**; Python consumers regenerate via `make gen`
+  or pin the published distribution by exact tag (see §4).
+
+The `.proto` files remain the **sole source of truth**; `gen/go` is a derived,
+reproducible artifact and any drift is fixed by re-running `make gen`, never by
+editing the generated files.
+
+Reproducibility targets (`Makefile`): `make lint` (`buf lint` + `buf format
+--diff`, the contract gate), `make gen` (regenerate Go+Python and build Go),
+`make breaking` (`buf breaking` vs. `main`).
 
 ## 6. Dependency graph (who consumes what)
 

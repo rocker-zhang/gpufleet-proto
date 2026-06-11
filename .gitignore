@@ -1,6 +1,8 @@
-# Generated code is NOT committed; modules vendor from a published/pinned tag
-# via buf or regenerate locally. Keep the repo to source-of-truth .proto only.
-/gen/
+# Go bindings (gen/go) ARE committed: Go consumers vendor them read-only at the
+# proto tag via `go.mod` (CONTRACTS.md §4), so the tagged tree must carry them.
+# Regenerate with `make gen` (buf generate) — never hand-edit. Python bindings
+# stay out of git; Python consumers regenerate (`make gen`) or pin the dist.
+/gen/python/
 
 # buf
 buf.lock
