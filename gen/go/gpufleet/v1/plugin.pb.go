@@ -103,6 +103,61 @@ func (ConsentTier) EnumDescriptor() ([]byte, []int) {
 	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{0}
 }
 
+// CountBucket is a COARSE occurrence bucket. Digests never carry an exact count —
+// an exact number could fingerprint a customer's fleet size. Only the bucket
+// crosses the wire.
+type CountBucket int32
+
+const (
+	CountBucket_COUNT_BUCKET_UNSPECIFIED CountBucket = 0
+	CountBucket_COUNT_BUCKET_ONE         CountBucket = 1 // exactly one
+	CountBucket_COUNT_BUCKET_FEW         CountBucket = 2 // 2–5
+	CountBucket_COUNT_BUCKET_MANY        CountBucket = 3 // 6 or more
+)
+
+// Enum value maps for CountBucket.
+var (
+	CountBucket_name = map[int32]string{
+		0: "COUNT_BUCKET_UNSPECIFIED",
+		1: "COUNT_BUCKET_ONE",
+		2: "COUNT_BUCKET_FEW",
+		3: "COUNT_BUCKET_MANY",
+	}
+	CountBucket_value = map[string]int32{
+		"COUNT_BUCKET_UNSPECIFIED": 0,
+		"COUNT_BUCKET_ONE":         1,
+		"COUNT_BUCKET_FEW":         2,
+		"COUNT_BUCKET_MANY":        3,
+	}
+)
+
+func (x CountBucket) Enum() *CountBucket {
+	p := new(CountBucket)
+	*p = x
+	return p
+}
+
+func (x CountBucket) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CountBucket) Descriptor() protoreflect.EnumDescriptor {
+	return file_gpufleet_v1_plugin_proto_enumTypes[1].Descriptor()
+}
+
+func (CountBucket) Type() protoreflect.EnumType {
+	return &file_gpufleet_v1_plugin_proto_enumTypes[1]
+}
+
+func (x CountBucket) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CountBucket.Descriptor instead.
+func (CountBucket) EnumDescriptor() ([]byte, []int) {
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{1}
+}
+
 type HealthResponse_ServingStatus int32
 
 const (
@@ -136,11 +191,11 @@ func (x HealthResponse_ServingStatus) String() string {
 }
 
 func (HealthResponse_ServingStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_gpufleet_v1_plugin_proto_enumTypes[1].Descriptor()
+	return file_gpufleet_v1_plugin_proto_enumTypes[2].Descriptor()
 }
 
 func (HealthResponse_ServingStatus) Type() protoreflect.EnumType {
-	return &file_gpufleet_v1_plugin_proto_enumTypes[1]
+	return &file_gpufleet_v1_plugin_proto_enumTypes[2]
 }
 
 func (x HealthResponse_ServingStatus) Number() protoreflect.EnumNumber {
@@ -149,7 +204,7 @@ func (x HealthResponse_ServingStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HealthResponse_ServingStatus.Descriptor instead.
 func (HealthResponse_ServingStatus) EnumDescriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{10, 0}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{11, 0}
 }
 
 // ResourceBudget bounds a single collection so a probe can never stall a node.
@@ -519,6 +574,102 @@ func (x *InvestigateResponse) GetDirectives() []*CollectDirective {
 	return nil
 }
 
+// DesensitizedDigest is an OPT-IN, DESENSITIZED, SIGNED product-health summary an
+// agent MAY send back to the control plane (off by default). It is DELIBERATELY
+// INCAPABLE of carrying customer data: there is NO field for a device id, job id,
+// hostname, UUID, timestamp, telemetry value, or any free-form fleet-identifying
+// string. Desensitization is STRUCTURAL, not a policy that could be misread —
+// the message simply has nowhere to put raw telemetry.
+//
+// RED LINE (D-0003 / master plan): this is NOT corpus and NEVER feeds the fault
+// corpus. The corpus is lab-synthesized injection ONLY (CFIUS-clean by
+// construction); a customer digest must never become training/answer-key data.
+// This digest exists solely to aggregate "which fault classes fire across the
+// install base, by agent release" for product health.
+type DesensitizedDigest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// What fired (or ABSTAIN). A class enum — not a description, not a device.
+	FaultClass FaultClass `protobuf:"varint,1,opt,name=fault_class,json=faultClass,proto3,enum=gpufleet.v1.FaultClass" json:"fault_class,omitempty"`
+	// Which gate signature corroborated it (enum, no detail).
+	Signature GateSignature `protobuf:"varint,2,opt,name=signature,proto3,enum=gpufleet.v1.GateSignature" json:"signature,omitempty"`
+	// Coarse occurrence bucket (never an exact count).
+	CountBucket CountBucket `protobuf:"varint,3,opt,name=count_bucket,json=countBucket,proto3,enum=gpufleet.v1.CountBucket" json:"count_bucket,omitempty"`
+	// The reporting agent's release version (our own build string, for
+	// by-release aggregation). Not customer-derived.
+	AgentVersion string `protobuf:"bytes,4,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
+	// Ed25519 signature over the canonical bytes of fields 1–4, by the agent
+	// build's release key, so the control plane can attribute provenance and
+	// reject forged digests. Signs only the desensitized summary above.
+	SignedDigest  []byte `protobuf:"bytes,5,opt,name=signed_digest,json=signedDigest,proto3" json:"signed_digest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DesensitizedDigest) Reset() {
+	*x = DesensitizedDigest{}
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DesensitizedDigest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DesensitizedDigest) ProtoMessage() {}
+
+func (x *DesensitizedDigest) ProtoReflect() protoreflect.Message {
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DesensitizedDigest.ProtoReflect.Descriptor instead.
+func (*DesensitizedDigest) Descriptor() ([]byte, []int) {
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DesensitizedDigest) GetFaultClass() FaultClass {
+	if x != nil {
+		return x.FaultClass
+	}
+	return FaultClass_FAULT_CLASS_UNSPECIFIED
+}
+
+func (x *DesensitizedDigest) GetSignature() GateSignature {
+	if x != nil {
+		return x.Signature
+	}
+	return GateSignature_GATE_SIGNATURE_UNSPECIFIED
+}
+
+func (x *DesensitizedDigest) GetCountBucket() CountBucket {
+	if x != nil {
+		return x.CountBucket
+	}
+	return CountBucket_COUNT_BUCKET_UNSPECIFIED
+}
+
+func (x *DesensitizedDigest) GetAgentVersion() string {
+	if x != nil {
+		return x.AgentVersion
+	}
+	return ""
+}
+
+func (x *DesensitizedDigest) GetSignedDigest() []byte {
+	if x != nil {
+		return x.SignedDigest
+	}
+	return nil
+}
+
 // PluginCapability advertises one class of signal a plugin can emit, so the
 // agent can route and so the gate can reason about source independence.
 // Retained for back-compat; new builds SHOULD populate `capabilities` with
@@ -537,7 +688,7 @@ type PluginCapability struct {
 
 func (x *PluginCapability) Reset() {
 	*x = PluginCapability{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -549,7 +700,7 @@ func (x *PluginCapability) String() string {
 func (*PluginCapability) ProtoMessage() {}
 
 func (x *PluginCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -562,7 +713,7 @@ func (x *PluginCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginCapability.ProtoReflect.Descriptor instead.
 func (*PluginCapability) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{4}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PluginCapability) GetSource() SignalSource {
@@ -594,7 +745,7 @@ type DescribeRequest struct {
 
 func (x *DescribeRequest) Reset() {
 	*x = DescribeRequest{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -606,7 +757,7 @@ func (x *DescribeRequest) String() string {
 func (*DescribeRequest) ProtoMessage() {}
 
 func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -619,7 +770,7 @@ func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeRequest.ProtoReflect.Descriptor instead.
 func (*DescribeRequest) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{5}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{6}
 }
 
 type DescribeResponse struct {
@@ -643,7 +794,7 @@ type DescribeResponse struct {
 
 func (x *DescribeResponse) Reset() {
 	*x = DescribeResponse{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -655,7 +806,7 @@ func (x *DescribeResponse) String() string {
 func (*DescribeResponse) ProtoMessage() {}
 
 func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -668,7 +819,7 @@ func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeResponse.ProtoReflect.Descriptor instead.
 func (*DescribeResponse) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{6}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DescribeResponse) GetName() string {
@@ -730,7 +881,7 @@ type CollectRequest struct {
 
 func (x *CollectRequest) Reset() {
 	*x = CollectRequest{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +893,7 @@ func (x *CollectRequest) String() string {
 func (*CollectRequest) ProtoMessage() {}
 
 func (x *CollectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -755,7 +906,7 @@ func (x *CollectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectRequest.ProtoReflect.Descriptor instead.
 func (*CollectRequest) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{7}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CollectRequest) GetWindowStart() *timestamppb.Timestamp {
@@ -816,7 +967,7 @@ type CollectResponse struct {
 
 func (x *CollectResponse) Reset() {
 	*x = CollectResponse{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -828,7 +979,7 @@ func (x *CollectResponse) String() string {
 func (*CollectResponse) ProtoMessage() {}
 
 func (x *CollectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +992,7 @@ func (x *CollectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectResponse.ProtoReflect.Descriptor instead.
 func (*CollectResponse) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{8}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CollectResponse) GetEvidence() *EvidencePack {
@@ -873,7 +1024,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +1036,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +1049,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{9}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{10}
 }
 
 type HealthResponse struct {
@@ -912,7 +1063,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[10]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -924,7 +1075,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[10]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -937,7 +1088,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{10}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *HealthResponse) GetStatus() HealthResponse_ServingStatus {
@@ -989,7 +1140,14 @@ const file_gpufleet_v1_plugin_proto_rawDesc = "" +
 	"\averdict\x18\x01 \x01(\v2\x14.gpufleet.v1.VerdictR\averdict\x12=\n" +
 	"\n" +
 	"directives\x18\x02 \x03(\v2\x1d.gpufleet.v1.CollectDirectiveR\n" +
-	"directives\"\x8c\x01\n" +
+	"directives\"\x8f\x02\n" +
+	"\x12DesensitizedDigest\x128\n" +
+	"\vfault_class\x18\x01 \x01(\x0e2\x17.gpufleet.v1.FaultClassR\n" +
+	"faultClass\x128\n" +
+	"\tsignature\x18\x02 \x01(\x0e2\x1a.gpufleet.v1.GateSignatureR\tsignature\x12;\n" +
+	"\fcount_bucket\x18\x03 \x01(\x0e2\x18.gpufleet.v1.CountBucketR\vcountBucket\x12#\n" +
+	"\ragent_version\x18\x04 \x01(\tR\fagentVersion\x12#\n" +
+	"\rsigned_digest\x18\x05 \x01(\fR\fsignedDigest\"\x8c\x01\n" +
 	"\x10PluginCapability\x121\n" +
 	"\x06source\x18\x01 \x01(\x0e2\x19.gpufleet.v1.SignalSourceR\x06source\x12#\n" +
 	"\rcapability_id\x18\x02 \x01(\tR\fcapabilityId\x12 \n" +
@@ -1027,7 +1185,12 @@ const file_gpufleet_v1_plugin_proto_rawDesc = "" +
 	"\vConsentTier\x12\x1c\n" +
 	"\x18CONSENT_TIER_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CONSENT_TIER_UNPRIVILEGED\x10\x01\x12\x1b\n" +
-	"\x17CONSENT_TIER_PRIVILEGED\x10\x022\xe1\x01\n" +
+	"\x17CONSENT_TIER_PRIVILEGED\x10\x02*n\n" +
+	"\vCountBucket\x12\x1c\n" +
+	"\x18COUNT_BUCKET_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10COUNT_BUCKET_ONE\x10\x01\x12\x14\n" +
+	"\x10COUNT_BUCKET_FEW\x10\x02\x12\x15\n" +
+	"\x11COUNT_BUCKET_MANY\x10\x032\xe1\x01\n" +
 	"\rPluginService\x12G\n" +
 	"\bDescribe\x12\x1c.gpufleet.v1.DescribeRequest\x1a\x1d.gpufleet.v1.DescribeResponse\x12D\n" +
 	"\aCollect\x12\x1b.gpufleet.v1.CollectRequest\x1a\x1c.gpufleet.v1.CollectResponse\x12A\n" +
@@ -1046,62 +1209,69 @@ func file_gpufleet_v1_plugin_proto_rawDescGZIP() []byte {
 	return file_gpufleet_v1_plugin_proto_rawDescData
 }
 
-var file_gpufleet_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_gpufleet_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_gpufleet_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_gpufleet_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_gpufleet_v1_plugin_proto_goTypes = []any{
 	(ConsentTier)(0),                  // 0: gpufleet.v1.ConsentTier
-	(HealthResponse_ServingStatus)(0), // 1: gpufleet.v1.HealthResponse.ServingStatus
-	(*ResourceBudget)(nil),            // 2: gpufleet.v1.ResourceBudget
-	(*CapabilityDescriptor)(nil),      // 3: gpufleet.v1.CapabilityDescriptor
-	(*CollectDirective)(nil),          // 4: gpufleet.v1.CollectDirective
-	(*InvestigateResponse)(nil),       // 5: gpufleet.v1.InvestigateResponse
-	(*PluginCapability)(nil),          // 6: gpufleet.v1.PluginCapability
-	(*DescribeRequest)(nil),           // 7: gpufleet.v1.DescribeRequest
-	(*DescribeResponse)(nil),          // 8: gpufleet.v1.DescribeResponse
-	(*CollectRequest)(nil),            // 9: gpufleet.v1.CollectRequest
-	(*CollectResponse)(nil),           // 10: gpufleet.v1.CollectResponse
-	(*HealthRequest)(nil),             // 11: gpufleet.v1.HealthRequest
-	(*HealthResponse)(nil),            // 12: gpufleet.v1.HealthResponse
-	nil,                               // 13: gpufleet.v1.CollectDirective.ParamsEntry
-	nil,                               // 14: gpufleet.v1.CollectRequest.OptionsEntry
-	(*durationpb.Duration)(nil),       // 15: google.protobuf.Duration
-	(SignalSource)(0),                 // 16: gpufleet.v1.SignalSource
-	(*timestamppb.Timestamp)(nil),     // 17: google.protobuf.Timestamp
-	(*Verdict)(nil),                   // 18: gpufleet.v1.Verdict
-	(*EvidencePack)(nil),              // 19: gpufleet.v1.EvidencePack
+	(CountBucket)(0),                  // 1: gpufleet.v1.CountBucket
+	(HealthResponse_ServingStatus)(0), // 2: gpufleet.v1.HealthResponse.ServingStatus
+	(*ResourceBudget)(nil),            // 3: gpufleet.v1.ResourceBudget
+	(*CapabilityDescriptor)(nil),      // 4: gpufleet.v1.CapabilityDescriptor
+	(*CollectDirective)(nil),          // 5: gpufleet.v1.CollectDirective
+	(*InvestigateResponse)(nil),       // 6: gpufleet.v1.InvestigateResponse
+	(*DesensitizedDigest)(nil),        // 7: gpufleet.v1.DesensitizedDigest
+	(*PluginCapability)(nil),          // 8: gpufleet.v1.PluginCapability
+	(*DescribeRequest)(nil),           // 9: gpufleet.v1.DescribeRequest
+	(*DescribeResponse)(nil),          // 10: gpufleet.v1.DescribeResponse
+	(*CollectRequest)(nil),            // 11: gpufleet.v1.CollectRequest
+	(*CollectResponse)(nil),           // 12: gpufleet.v1.CollectResponse
+	(*HealthRequest)(nil),             // 13: gpufleet.v1.HealthRequest
+	(*HealthResponse)(nil),            // 14: gpufleet.v1.HealthResponse
+	nil,                               // 15: gpufleet.v1.CollectDirective.ParamsEntry
+	nil,                               // 16: gpufleet.v1.CollectRequest.OptionsEntry
+	(*durationpb.Duration)(nil),       // 17: google.protobuf.Duration
+	(SignalSource)(0),                 // 18: gpufleet.v1.SignalSource
+	(*timestamppb.Timestamp)(nil),     // 19: google.protobuf.Timestamp
+	(*Verdict)(nil),                   // 20: gpufleet.v1.Verdict
+	(FaultClass)(0),                   // 21: gpufleet.v1.FaultClass
+	(GateSignature)(0),                // 22: gpufleet.v1.GateSignature
+	(*EvidencePack)(nil),              // 23: gpufleet.v1.EvidencePack
 }
 var file_gpufleet_v1_plugin_proto_depIdxs = []int32{
-	15, // 0: gpufleet.v1.ResourceBudget.max_duration:type_name -> google.protobuf.Duration
+	17, // 0: gpufleet.v1.ResourceBudget.max_duration:type_name -> google.protobuf.Duration
 	0,  // 1: gpufleet.v1.CapabilityDescriptor.tier:type_name -> gpufleet.v1.ConsentTier
-	16, // 2: gpufleet.v1.CapabilityDescriptor.source:type_name -> gpufleet.v1.SignalSource
-	2,  // 3: gpufleet.v1.CapabilityDescriptor.resource_budget:type_name -> gpufleet.v1.ResourceBudget
-	13, // 4: gpufleet.v1.CollectDirective.params:type_name -> gpufleet.v1.CollectDirective.ParamsEntry
-	2,  // 5: gpufleet.v1.CollectDirective.budget:type_name -> gpufleet.v1.ResourceBudget
-	17, // 6: gpufleet.v1.CollectDirective.window_start:type_name -> google.protobuf.Timestamp
-	17, // 7: gpufleet.v1.CollectDirective.window_end:type_name -> google.protobuf.Timestamp
-	18, // 8: gpufleet.v1.InvestigateResponse.verdict:type_name -> gpufleet.v1.Verdict
-	4,  // 9: gpufleet.v1.InvestigateResponse.directives:type_name -> gpufleet.v1.CollectDirective
-	16, // 10: gpufleet.v1.PluginCapability.source:type_name -> gpufleet.v1.SignalSource
-	6,  // 11: gpufleet.v1.DescribeResponse.capabilities:type_name -> gpufleet.v1.PluginCapability
-	3,  // 12: gpufleet.v1.DescribeResponse.catalog:type_name -> gpufleet.v1.CapabilityDescriptor
-	17, // 13: gpufleet.v1.CollectRequest.window_start:type_name -> google.protobuf.Timestamp
-	17, // 14: gpufleet.v1.CollectRequest.window_end:type_name -> google.protobuf.Timestamp
-	15, // 15: gpufleet.v1.CollectRequest.deadline:type_name -> google.protobuf.Duration
-	14, // 16: gpufleet.v1.CollectRequest.options:type_name -> gpufleet.v1.CollectRequest.OptionsEntry
-	4,  // 17: gpufleet.v1.CollectRequest.directive:type_name -> gpufleet.v1.CollectDirective
-	19, // 18: gpufleet.v1.CollectResponse.evidence:type_name -> gpufleet.v1.EvidencePack
-	1,  // 19: gpufleet.v1.HealthResponse.status:type_name -> gpufleet.v1.HealthResponse.ServingStatus
-	7,  // 20: gpufleet.v1.PluginService.Describe:input_type -> gpufleet.v1.DescribeRequest
-	9,  // 21: gpufleet.v1.PluginService.Collect:input_type -> gpufleet.v1.CollectRequest
-	11, // 22: gpufleet.v1.PluginService.Health:input_type -> gpufleet.v1.HealthRequest
-	8,  // 23: gpufleet.v1.PluginService.Describe:output_type -> gpufleet.v1.DescribeResponse
-	10, // 24: gpufleet.v1.PluginService.Collect:output_type -> gpufleet.v1.CollectResponse
-	12, // 25: gpufleet.v1.PluginService.Health:output_type -> gpufleet.v1.HealthResponse
-	23, // [23:26] is the sub-list for method output_type
-	20, // [20:23] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	18, // 2: gpufleet.v1.CapabilityDescriptor.source:type_name -> gpufleet.v1.SignalSource
+	3,  // 3: gpufleet.v1.CapabilityDescriptor.resource_budget:type_name -> gpufleet.v1.ResourceBudget
+	15, // 4: gpufleet.v1.CollectDirective.params:type_name -> gpufleet.v1.CollectDirective.ParamsEntry
+	3,  // 5: gpufleet.v1.CollectDirective.budget:type_name -> gpufleet.v1.ResourceBudget
+	19, // 6: gpufleet.v1.CollectDirective.window_start:type_name -> google.protobuf.Timestamp
+	19, // 7: gpufleet.v1.CollectDirective.window_end:type_name -> google.protobuf.Timestamp
+	20, // 8: gpufleet.v1.InvestigateResponse.verdict:type_name -> gpufleet.v1.Verdict
+	5,  // 9: gpufleet.v1.InvestigateResponse.directives:type_name -> gpufleet.v1.CollectDirective
+	21, // 10: gpufleet.v1.DesensitizedDigest.fault_class:type_name -> gpufleet.v1.FaultClass
+	22, // 11: gpufleet.v1.DesensitizedDigest.signature:type_name -> gpufleet.v1.GateSignature
+	1,  // 12: gpufleet.v1.DesensitizedDigest.count_bucket:type_name -> gpufleet.v1.CountBucket
+	18, // 13: gpufleet.v1.PluginCapability.source:type_name -> gpufleet.v1.SignalSource
+	8,  // 14: gpufleet.v1.DescribeResponse.capabilities:type_name -> gpufleet.v1.PluginCapability
+	4,  // 15: gpufleet.v1.DescribeResponse.catalog:type_name -> gpufleet.v1.CapabilityDescriptor
+	19, // 16: gpufleet.v1.CollectRequest.window_start:type_name -> google.protobuf.Timestamp
+	19, // 17: gpufleet.v1.CollectRequest.window_end:type_name -> google.protobuf.Timestamp
+	17, // 18: gpufleet.v1.CollectRequest.deadline:type_name -> google.protobuf.Duration
+	16, // 19: gpufleet.v1.CollectRequest.options:type_name -> gpufleet.v1.CollectRequest.OptionsEntry
+	5,  // 20: gpufleet.v1.CollectRequest.directive:type_name -> gpufleet.v1.CollectDirective
+	23, // 21: gpufleet.v1.CollectResponse.evidence:type_name -> gpufleet.v1.EvidencePack
+	2,  // 22: gpufleet.v1.HealthResponse.status:type_name -> gpufleet.v1.HealthResponse.ServingStatus
+	9,  // 23: gpufleet.v1.PluginService.Describe:input_type -> gpufleet.v1.DescribeRequest
+	11, // 24: gpufleet.v1.PluginService.Collect:input_type -> gpufleet.v1.CollectRequest
+	13, // 25: gpufleet.v1.PluginService.Health:input_type -> gpufleet.v1.HealthRequest
+	10, // 26: gpufleet.v1.PluginService.Describe:output_type -> gpufleet.v1.DescribeResponse
+	12, // 27: gpufleet.v1.PluginService.Collect:output_type -> gpufleet.v1.CollectResponse
+	14, // 28: gpufleet.v1.PluginService.Health:output_type -> gpufleet.v1.HealthResponse
+	26, // [26:29] is the sub-list for method output_type
+	23, // [23:26] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_gpufleet_v1_plugin_proto_init() }
@@ -1116,8 +1286,8 @@ func file_gpufleet_v1_plugin_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gpufleet_v1_plugin_proto_rawDesc), len(file_gpufleet_v1_plugin_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   13,
+			NumEnums:      3,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -177,6 +177,48 @@ message InvestigateResponse {
   repeated CollectDirective directives = 2;
 }
 
+// CountBucket is a COARSE occurrence bucket. Digests never carry an exact count —
+// an exact number could fingerprint a customer's fleet size. Only the bucket
+// crosses the wire.
+enum CountBucket {
+  COUNT_BUCKET_UNSPECIFIED = 0;
+  COUNT_BUCKET_ONE = 1; // exactly one
+  COUNT_BUCKET_FEW = 2; // 2–5
+  COUNT_BUCKET_MANY = 3; // 6 or more
+}
+
+// DesensitizedDigest is an OPT-IN, DESENSITIZED, SIGNED product-health summary an
+// agent MAY send back to the control plane (off by default). It is DELIBERATELY
+// INCAPABLE of carrying customer data: there is NO field for a device id, job id,
+// hostname, UUID, timestamp, telemetry value, or any free-form fleet-identifying
+// string. Desensitization is STRUCTURAL, not a policy that could be misread —
+// the message simply has nowhere to put raw telemetry.
+//
+// RED LINE (D-0003 / master plan): this is NOT corpus and NEVER feeds the fault
+// corpus. The corpus is lab-synthesized injection ONLY (CFIUS-clean by
+// construction); a customer digest must never become training/answer-key data.
+// This digest exists solely to aggregate "which fault classes fire across the
+// install base, by agent release" for product health.
+message DesensitizedDigest {
+  // What fired (or ABSTAIN). A class enum — not a description, not a device.
+  FaultClass fault_class = 1;
+
+  // Which gate signature corroborated it (enum, no detail).
+  GateSignature signature = 2;
+
+  // Coarse occurrence bucket (never an exact count).
+  CountBucket count_bucket = 3;
+
+  // The reporting agent's release version (our own build string, for
+  // by-release aggregation). Not customer-derived.
+  string agent_version = 4;
+
+  // Ed25519 signature over the canonical bytes of fields 1–4, by the agent
+  // build's release key, so the control plane can attribute provenance and
+  // reject forged digests. Signs only the desensitized summary above.
+  bytes signed_digest = 5;
+}
+
 // PluginCapability advertises one class of signal a plugin can emit, so the
 // agent can route and so the gate can reason about source independence.
 // Retained for back-compat; new builds SHOULD populate `capabilities` with
