@@ -242,8 +242,11 @@ type CapabilityDescriptor struct {
 	// gate's >=2-INDEPENDENT-source reasoning. Independence is judged on source.
 	Source SignalSource `protobuf:"varint,3,opt,name=source,proto3,enum=gpufleet.v1.SignalSource" json:"source,omitempty"`
 	// Reference (URL or registry key) to the OPEN JSON-schema describing this
-	// capability's accepted `params`. The agent validates a directive's params
-	// against this schema; the wire stays generic (params is a string map).
+	// capability's accepted `params`. The agent is INTENDED to validate a
+	// directive's params against this schema; the wire stays generic (params is a
+	// string map). NOT YET ENFORCED: the current agent build does not yet validate
+	// params against the schema (params pass through unchecked) — planned under
+	// TASK-0025. Until then the downstream collector is the only params guard.
 	ParamsSchemaRef string `protobuf:"bytes,4,opt,name=params_schema_ref,json=paramsSchemaRef,proto3" json:"params_schema_ref,omitempty"`
 	// Default/maximum resource budget the agent will permit for this capability.
 	// A directive may request <= this; never more.
@@ -254,10 +257,14 @@ type CapabilityDescriptor struct {
 	Version string `protobuf:"bytes,7,opt,name=version,proto3" json:"version,omitempty"`
 	// Detached signature over this descriptor's canonical bytes (id + tier +
 	// source + params_schema_ref + resource_budget + version), produced by the
-	// agent build's release key. The controlplane verifies it against the pinned
-	// public key before trusting a Describe catalog, so a tampered or unknown
-	// capability cannot be advertised into the fleet. It signs WHAT the capability
-	// is — never code to run (D-0011: directives reference a verified id only).
+	// agent build's release key. INTENDED USE: the controlplane verifies it
+	// against the pinned public key before trusting a Describe catalog, so a
+	// tampered or unknown capability cannot be advertised into the fleet. It signs
+	// WHAT the capability is — never code to run (D-0011: directives reference a
+	// verified id only). NOT YET ENFORCED: the current agent build does not
+	// populate this field and the control plane does not yet verify it — planned
+	// under TASK-0027. (No current exposure: the directive validator checks the
+	// agent's own in-process fixed catalog, not a control-plane-supplied one.)
 	SignedDigest  []byte `protobuf:"bytes,8,opt,name=signed_digest,json=signedDigest,proto3" json:"signed_digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
