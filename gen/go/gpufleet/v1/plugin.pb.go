@@ -149,7 +149,7 @@ func (x HealthResponse_ServingStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HealthResponse_ServingStatus.Descriptor instead.
 func (HealthResponse_ServingStatus) EnumDescriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{9, 0}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{10, 0}
 }
 
 // ResourceBudget bounds a single collection so a probe can never stall a node.
@@ -456,6 +456,69 @@ func (x *CollectDirective) GetDeviceUuids() []string {
 	return nil
 }
 
+// InvestigateResponse is what the control plane returns from /v1/investigate: the
+// open Verdict plus zero or more DECLARATIVE directives it asks the agent to run
+// next (D-0011 piggyback). The directives reference capability ids only — never
+// code — and the agent re-validates each against its own catalog + consent +
+// budget before running any (the agent is the final authority on its host). A
+// response with no directives is the common case; the control plane stays silent
+// unless it has a concrete, deterministic reason to ask for more collection.
+type InvestigateResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The adjudication for the submitted evidence (the same message a bare
+	// /v1/investigate used to return).
+	Verdict *Verdict `protobuf:"bytes,1,opt,name=verdict,proto3" json:"verdict,omitempty"`
+	// Declarative follow-up collection requests (may be empty). Each names a
+	// capability the agent advertises; the agent enforces allowlist/consent/budget.
+	Directives    []*CollectDirective `protobuf:"bytes,2,rep,name=directives,proto3" json:"directives,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InvestigateResponse) Reset() {
+	*x = InvestigateResponse{}
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvestigateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvestigateResponse) ProtoMessage() {}
+
+func (x *InvestigateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvestigateResponse.ProtoReflect.Descriptor instead.
+func (*InvestigateResponse) Descriptor() ([]byte, []int) {
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *InvestigateResponse) GetVerdict() *Verdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return nil
+}
+
+func (x *InvestigateResponse) GetDirectives() []*CollectDirective {
+	if x != nil {
+		return x.Directives
+	}
+	return nil
+}
+
 // PluginCapability advertises one class of signal a plugin can emit, so the
 // agent can route and so the gate can reason about source independence.
 // Retained for back-compat; new builds SHOULD populate `capabilities` with
@@ -474,7 +537,7 @@ type PluginCapability struct {
 
 func (x *PluginCapability) Reset() {
 	*x = PluginCapability{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[3]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -486,7 +549,7 @@ func (x *PluginCapability) String() string {
 func (*PluginCapability) ProtoMessage() {}
 
 func (x *PluginCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[3]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -499,7 +562,7 @@ func (x *PluginCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginCapability.ProtoReflect.Descriptor instead.
 func (*PluginCapability) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{3}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PluginCapability) GetSource() SignalSource {
@@ -531,7 +594,7 @@ type DescribeRequest struct {
 
 func (x *DescribeRequest) Reset() {
 	*x = DescribeRequest{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -543,7 +606,7 @@ func (x *DescribeRequest) String() string {
 func (*DescribeRequest) ProtoMessage() {}
 
 func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[4]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -556,7 +619,7 @@ func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeRequest.ProtoReflect.Descriptor instead.
 func (*DescribeRequest) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{4}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{5}
 }
 
 type DescribeResponse struct {
@@ -580,7 +643,7 @@ type DescribeResponse struct {
 
 func (x *DescribeResponse) Reset() {
 	*x = DescribeResponse{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -592,7 +655,7 @@ func (x *DescribeResponse) String() string {
 func (*DescribeResponse) ProtoMessage() {}
 
 func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[5]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -605,7 +668,7 @@ func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeResponse.ProtoReflect.Descriptor instead.
 func (*DescribeResponse) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{5}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DescribeResponse) GetName() string {
@@ -667,7 +730,7 @@ type CollectRequest struct {
 
 func (x *CollectRequest) Reset() {
 	*x = CollectRequest{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -679,7 +742,7 @@ func (x *CollectRequest) String() string {
 func (*CollectRequest) ProtoMessage() {}
 
 func (x *CollectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[6]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -692,7 +755,7 @@ func (x *CollectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectRequest.ProtoReflect.Descriptor instead.
 func (*CollectRequest) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{6}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CollectRequest) GetWindowStart() *timestamppb.Timestamp {
@@ -753,7 +816,7 @@ type CollectResponse struct {
 
 func (x *CollectResponse) Reset() {
 	*x = CollectResponse{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -765,7 +828,7 @@ func (x *CollectResponse) String() string {
 func (*CollectResponse) ProtoMessage() {}
 
 func (x *CollectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[7]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -778,7 +841,7 @@ func (x *CollectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectResponse.ProtoReflect.Descriptor instead.
 func (*CollectResponse) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{7}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CollectResponse) GetEvidence() *EvidencePack {
@@ -810,7 +873,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -822,7 +885,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[8]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -835,7 +898,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{8}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{9}
 }
 
 type HealthResponse struct {
@@ -849,7 +912,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -861,7 +924,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_gpufleet_v1_plugin_proto_msgTypes[9]
+	mi := &file_gpufleet_v1_plugin_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -874,7 +937,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{9}
+	return file_gpufleet_v1_plugin_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *HealthResponse) GetStatus() HealthResponse_ServingStatus {
@@ -895,7 +958,7 @@ var File_gpufleet_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_gpufleet_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	"\x18gpufleet/v1/plugin.proto\x12\vgpufleet.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18gpufleet/v1/signal.proto\"\xc5\x01\n" +
+	"\x18gpufleet/v1/plugin.proto\x12\vgpufleet.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18gpufleet/v1/signal.proto\x1a\x19gpufleet/v1/verdict.proto\"\xc5\x01\n" +
 	"\x0eResourceBudget\x12<\n" +
 	"\fmax_duration\x18\x01 \x01(\v2\x19.google.protobuf.DurationR\vmaxDuration\x12,\n" +
 	"\x12max_cpu_millicores\x18\x02 \x01(\rR\x10maxCpuMillicores\x12&\n" +
@@ -921,7 +984,12 @@ const file_gpufleet_v1_plugin_proto_rawDesc = "" +
 	"\fdevice_uuids\x18\x06 \x03(\tR\vdeviceUuids\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8c\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x84\x01\n" +
+	"\x13InvestigateResponse\x12.\n" +
+	"\averdict\x18\x01 \x01(\v2\x14.gpufleet.v1.VerdictR\averdict\x12=\n" +
+	"\n" +
+	"directives\x18\x02 \x03(\v2\x1d.gpufleet.v1.CollectDirectiveR\n" +
+	"directives\"\x8c\x01\n" +
 	"\x10PluginCapability\x121\n" +
 	"\x06source\x18\x01 \x01(\x0e2\x19.gpufleet.v1.SignalSourceR\x06source\x12#\n" +
 	"\rcapability_id\x18\x02 \x01(\tR\fcapabilityId\x12 \n" +
@@ -979,57 +1047,61 @@ func file_gpufleet_v1_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_gpufleet_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_gpufleet_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_gpufleet_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_gpufleet_v1_plugin_proto_goTypes = []any{
 	(ConsentTier)(0),                  // 0: gpufleet.v1.ConsentTier
 	(HealthResponse_ServingStatus)(0), // 1: gpufleet.v1.HealthResponse.ServingStatus
 	(*ResourceBudget)(nil),            // 2: gpufleet.v1.ResourceBudget
 	(*CapabilityDescriptor)(nil),      // 3: gpufleet.v1.CapabilityDescriptor
 	(*CollectDirective)(nil),          // 4: gpufleet.v1.CollectDirective
-	(*PluginCapability)(nil),          // 5: gpufleet.v1.PluginCapability
-	(*DescribeRequest)(nil),           // 6: gpufleet.v1.DescribeRequest
-	(*DescribeResponse)(nil),          // 7: gpufleet.v1.DescribeResponse
-	(*CollectRequest)(nil),            // 8: gpufleet.v1.CollectRequest
-	(*CollectResponse)(nil),           // 9: gpufleet.v1.CollectResponse
-	(*HealthRequest)(nil),             // 10: gpufleet.v1.HealthRequest
-	(*HealthResponse)(nil),            // 11: gpufleet.v1.HealthResponse
-	nil,                               // 12: gpufleet.v1.CollectDirective.ParamsEntry
-	nil,                               // 13: gpufleet.v1.CollectRequest.OptionsEntry
-	(*durationpb.Duration)(nil),       // 14: google.protobuf.Duration
-	(SignalSource)(0),                 // 15: gpufleet.v1.SignalSource
-	(*timestamppb.Timestamp)(nil),     // 16: google.protobuf.Timestamp
-	(*EvidencePack)(nil),              // 17: gpufleet.v1.EvidencePack
+	(*InvestigateResponse)(nil),       // 5: gpufleet.v1.InvestigateResponse
+	(*PluginCapability)(nil),          // 6: gpufleet.v1.PluginCapability
+	(*DescribeRequest)(nil),           // 7: gpufleet.v1.DescribeRequest
+	(*DescribeResponse)(nil),          // 8: gpufleet.v1.DescribeResponse
+	(*CollectRequest)(nil),            // 9: gpufleet.v1.CollectRequest
+	(*CollectResponse)(nil),           // 10: gpufleet.v1.CollectResponse
+	(*HealthRequest)(nil),             // 11: gpufleet.v1.HealthRequest
+	(*HealthResponse)(nil),            // 12: gpufleet.v1.HealthResponse
+	nil,                               // 13: gpufleet.v1.CollectDirective.ParamsEntry
+	nil,                               // 14: gpufleet.v1.CollectRequest.OptionsEntry
+	(*durationpb.Duration)(nil),       // 15: google.protobuf.Duration
+	(SignalSource)(0),                 // 16: gpufleet.v1.SignalSource
+	(*timestamppb.Timestamp)(nil),     // 17: google.protobuf.Timestamp
+	(*Verdict)(nil),                   // 18: gpufleet.v1.Verdict
+	(*EvidencePack)(nil),              // 19: gpufleet.v1.EvidencePack
 }
 var file_gpufleet_v1_plugin_proto_depIdxs = []int32{
-	14, // 0: gpufleet.v1.ResourceBudget.max_duration:type_name -> google.protobuf.Duration
+	15, // 0: gpufleet.v1.ResourceBudget.max_duration:type_name -> google.protobuf.Duration
 	0,  // 1: gpufleet.v1.CapabilityDescriptor.tier:type_name -> gpufleet.v1.ConsentTier
-	15, // 2: gpufleet.v1.CapabilityDescriptor.source:type_name -> gpufleet.v1.SignalSource
+	16, // 2: gpufleet.v1.CapabilityDescriptor.source:type_name -> gpufleet.v1.SignalSource
 	2,  // 3: gpufleet.v1.CapabilityDescriptor.resource_budget:type_name -> gpufleet.v1.ResourceBudget
-	12, // 4: gpufleet.v1.CollectDirective.params:type_name -> gpufleet.v1.CollectDirective.ParamsEntry
+	13, // 4: gpufleet.v1.CollectDirective.params:type_name -> gpufleet.v1.CollectDirective.ParamsEntry
 	2,  // 5: gpufleet.v1.CollectDirective.budget:type_name -> gpufleet.v1.ResourceBudget
-	16, // 6: gpufleet.v1.CollectDirective.window_start:type_name -> google.protobuf.Timestamp
-	16, // 7: gpufleet.v1.CollectDirective.window_end:type_name -> google.protobuf.Timestamp
-	15, // 8: gpufleet.v1.PluginCapability.source:type_name -> gpufleet.v1.SignalSource
-	5,  // 9: gpufleet.v1.DescribeResponse.capabilities:type_name -> gpufleet.v1.PluginCapability
-	3,  // 10: gpufleet.v1.DescribeResponse.catalog:type_name -> gpufleet.v1.CapabilityDescriptor
-	16, // 11: gpufleet.v1.CollectRequest.window_start:type_name -> google.protobuf.Timestamp
-	16, // 12: gpufleet.v1.CollectRequest.window_end:type_name -> google.protobuf.Timestamp
-	14, // 13: gpufleet.v1.CollectRequest.deadline:type_name -> google.protobuf.Duration
-	13, // 14: gpufleet.v1.CollectRequest.options:type_name -> gpufleet.v1.CollectRequest.OptionsEntry
-	4,  // 15: gpufleet.v1.CollectRequest.directive:type_name -> gpufleet.v1.CollectDirective
-	17, // 16: gpufleet.v1.CollectResponse.evidence:type_name -> gpufleet.v1.EvidencePack
-	1,  // 17: gpufleet.v1.HealthResponse.status:type_name -> gpufleet.v1.HealthResponse.ServingStatus
-	6,  // 18: gpufleet.v1.PluginService.Describe:input_type -> gpufleet.v1.DescribeRequest
-	8,  // 19: gpufleet.v1.PluginService.Collect:input_type -> gpufleet.v1.CollectRequest
-	10, // 20: gpufleet.v1.PluginService.Health:input_type -> gpufleet.v1.HealthRequest
-	7,  // 21: gpufleet.v1.PluginService.Describe:output_type -> gpufleet.v1.DescribeResponse
-	9,  // 22: gpufleet.v1.PluginService.Collect:output_type -> gpufleet.v1.CollectResponse
-	11, // 23: gpufleet.v1.PluginService.Health:output_type -> gpufleet.v1.HealthResponse
-	21, // [21:24] is the sub-list for method output_type
-	18, // [18:21] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	17, // 6: gpufleet.v1.CollectDirective.window_start:type_name -> google.protobuf.Timestamp
+	17, // 7: gpufleet.v1.CollectDirective.window_end:type_name -> google.protobuf.Timestamp
+	18, // 8: gpufleet.v1.InvestigateResponse.verdict:type_name -> gpufleet.v1.Verdict
+	4,  // 9: gpufleet.v1.InvestigateResponse.directives:type_name -> gpufleet.v1.CollectDirective
+	16, // 10: gpufleet.v1.PluginCapability.source:type_name -> gpufleet.v1.SignalSource
+	6,  // 11: gpufleet.v1.DescribeResponse.capabilities:type_name -> gpufleet.v1.PluginCapability
+	3,  // 12: gpufleet.v1.DescribeResponse.catalog:type_name -> gpufleet.v1.CapabilityDescriptor
+	17, // 13: gpufleet.v1.CollectRequest.window_start:type_name -> google.protobuf.Timestamp
+	17, // 14: gpufleet.v1.CollectRequest.window_end:type_name -> google.protobuf.Timestamp
+	15, // 15: gpufleet.v1.CollectRequest.deadline:type_name -> google.protobuf.Duration
+	14, // 16: gpufleet.v1.CollectRequest.options:type_name -> gpufleet.v1.CollectRequest.OptionsEntry
+	4,  // 17: gpufleet.v1.CollectRequest.directive:type_name -> gpufleet.v1.CollectDirective
+	19, // 18: gpufleet.v1.CollectResponse.evidence:type_name -> gpufleet.v1.EvidencePack
+	1,  // 19: gpufleet.v1.HealthResponse.status:type_name -> gpufleet.v1.HealthResponse.ServingStatus
+	7,  // 20: gpufleet.v1.PluginService.Describe:input_type -> gpufleet.v1.DescribeRequest
+	9,  // 21: gpufleet.v1.PluginService.Collect:input_type -> gpufleet.v1.CollectRequest
+	11, // 22: gpufleet.v1.PluginService.Health:input_type -> gpufleet.v1.HealthRequest
+	8,  // 23: gpufleet.v1.PluginService.Describe:output_type -> gpufleet.v1.DescribeResponse
+	10, // 24: gpufleet.v1.PluginService.Collect:output_type -> gpufleet.v1.CollectResponse
+	12, // 25: gpufleet.v1.PluginService.Health:output_type -> gpufleet.v1.HealthResponse
+	23, // [23:26] is the sub-list for method output_type
+	20, // [20:23] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_gpufleet_v1_plugin_proto_init() }
@@ -1038,13 +1110,14 @@ func file_gpufleet_v1_plugin_proto_init() {
 		return
 	}
 	file_gpufleet_v1_signal_proto_init()
+	file_gpufleet_v1_verdict_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gpufleet_v1_plugin_proto_rawDesc), len(file_gpufleet_v1_plugin_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

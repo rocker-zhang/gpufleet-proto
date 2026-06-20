@@ -28,6 +28,7 @@ package gpufleet.v1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "gpufleet/v1/signal.proto";
+import "gpufleet/v1/verdict.proto";
 
 // PluginService is implemented by a collector plugin and called by the open
 // agent. It is intentionally minimal: describe your capability catalog, collect
@@ -157,6 +158,23 @@ message CollectDirective {
 
   // Optional device scope; empty means "all devices this capability sees".
   repeated string device_uuids = 6;
+}
+
+// InvestigateResponse is what the control plane returns from /v1/investigate: the
+// open Verdict plus zero or more DECLARATIVE directives it asks the agent to run
+// next (D-0011 piggyback). The directives reference capability ids only — never
+// code — and the agent re-validates each against its own catalog + consent +
+// budget before running any (the agent is the final authority on its host). A
+// response with no directives is the common case; the control plane stays silent
+// unless it has a concrete, deterministic reason to ask for more collection.
+message InvestigateResponse {
+  // The adjudication for the submitted evidence (the same message a bare
+  // /v1/investigate used to return).
+  Verdict verdict = 1;
+
+  // Declarative follow-up collection requests (may be empty). Each names a
+  // capability the agent advertises; the agent enforces allowlist/consent/budget.
+  repeated CollectDirective directives = 2;
 }
 
 // PluginCapability advertises one class of signal a plugin can emit, so the
