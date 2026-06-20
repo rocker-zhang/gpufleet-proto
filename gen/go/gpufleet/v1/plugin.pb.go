@@ -251,7 +251,14 @@ type CapabilityDescriptor struct {
 	// Human-readable description (non-adjudicating).
 	Description string `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
 	// Implementation version of this collector (semver), for audit/signing.
-	Version       string `protobuf:"bytes,7,opt,name=version,proto3" json:"version,omitempty"`
+	Version string `protobuf:"bytes,7,opt,name=version,proto3" json:"version,omitempty"`
+	// Detached signature over this descriptor's canonical bytes (id + tier +
+	// source + params_schema_ref + resource_budget + version), produced by the
+	// agent build's release key. The controlplane verifies it against the pinned
+	// public key before trusting a Describe catalog, so a tampered or unknown
+	// capability cannot be advertised into the fleet. It signs WHAT the capability
+	// is — never code to run (D-0011: directives reference a verified id only).
+	SignedDigest  []byte `protobuf:"bytes,8,opt,name=signed_digest,json=signedDigest,proto3" json:"signed_digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -333,6 +340,13 @@ func (x *CapabilityDescriptor) GetVersion() string {
 		return x.Version
 	}
 	return ""
+}
+
+func (x *CapabilityDescriptor) GetSignedDigest() []byte {
+	if x != nil {
+		return x.SignedDigest
+	}
+	return nil
 }
 
 // CollectDirective is the DECLARATIVE instruction the controlplane sends (in
@@ -880,7 +894,7 @@ const file_gpufleet_v1_plugin_proto_rawDesc = "" +
 	"\x12max_cpu_millicores\x18\x02 \x01(\rR\x10maxCpuMillicores\x12&\n" +
 	"\x0fmax_map_entries\x18\x03 \x01(\rR\rmaxMapEntries\x12\x1f\n" +
 	"\vmax_samples\x18\x04 \x01(\rR\n" +
-	"maxSamples\"\xb5\x02\n" +
+	"maxSamples\"\xda\x02\n" +
 	"\x14CapabilityDescriptor\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x04tier\x18\x02 \x01(\x0e2\x18.gpufleet.v1.ConsentTierR\x04tier\x121\n" +
@@ -888,7 +902,8 @@ const file_gpufleet_v1_plugin_proto_rawDesc = "" +
 	"\x11params_schema_ref\x18\x04 \x01(\tR\x0fparamsSchemaRef\x12D\n" +
 	"\x0fresource_budget\x18\x05 \x01(\v2\x1b.gpufleet.v1.ResourceBudgetR\x0eresourceBudget\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x18\n" +
-	"\aversion\x18\a \x01(\tR\aversion\"\x87\x03\n" +
+	"\aversion\x18\a \x01(\tR\aversion\x12#\n" +
+	"\rsigned_digest\x18\b \x01(\fR\fsignedDigest\"\x87\x03\n" +
 	"\x10CollectDirective\x12#\n" +
 	"\rcapability_id\x18\x01 \x01(\tR\fcapabilityId\x12A\n" +
 	"\x06params\x18\x02 \x03(\v2).gpufleet.v1.CollectDirective.ParamsEntryR\x06params\x123\n" +

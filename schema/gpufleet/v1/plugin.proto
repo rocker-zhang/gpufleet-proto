@@ -112,6 +112,14 @@ message CapabilityDescriptor {
 
   // Implementation version of this collector (semver), for audit/signing.
   string version = 7;
+
+  // Detached signature over this descriptor's canonical bytes (id + tier +
+  // source + params_schema_ref + resource_budget + version), produced by the
+  // agent build's release key. The controlplane verifies it against the pinned
+  // public key before trusting a Describe catalog, so a tampered or unknown
+  // capability cannot be advertised into the fleet. It signs WHAT the capability
+  // is — never code to run (D-0011: directives reference a verified id only).
+  bytes signed_digest = 8;
 }
 
 // CollectDirective is the DECLARATIVE instruction the controlplane sends (in

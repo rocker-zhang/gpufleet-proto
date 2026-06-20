@@ -1,0 +1,60 @@
+// fleet.proto defines the OPEN fleet-aggregation wire contract (D-0010).
+//
+// The closed controlplane aggregates many per-node Verdicts into a fleet view.
+// This envelope is the THIN, OPEN slice of that view it is allowed to hand back
+// to the open cli for rendering: open Verdicts keyed by fleet dimension, plus
+// counts that are pure sums over those Verdicts. It MUST NOT carry any closed
+// moat — no playbook body, baseline, prompt, cost model internals, license
+// state, or corpus. The controlplane PRODUCES it by projecting its internal
+// fleet state down to exactly these fields; nothing here lets a reader
+// reconstruct the closed control plane.
+syntax = "proto3";
+
+package gpufleet.v1;
+
+import "google/protobuf/timestamp.proto";
+import "gpufleet/v1/verdict.proto";
+
+// FleetEntry is one fleet-dimension-keyed Verdict: the open adjudication for a
+// (node, job, device) the cli renders as a row. The Verdict is the same open
+// contract the single-node path returns — no extra closed fields are attached.
+message FleetEntry {
+  // Node the verdict pertains to (controlplane-assigned fleet node id).
+  string node_id = 1;
+
+  // Job the affected device was running, if known (empty = unattributed).
+  string job_id = 2;
+
+  // Device the verdict pertains to (GPU UUID), if device-scoped.
+  string device_uuid = 3;
+
+  // The open Verdict (fault_class / cited_signals / cost_impact / narration).
+  // Carries no closed state by construction — it is the exact wire message the
+  // open agent already receives for a single node.
+  Verdict verdict = 4;
+}
+
+// AggregationEnvelope is the open fleet roll-up the cli renders. It is a thin
+// transport: a window, the keyed Verdicts, and counts derived purely from those
+// Verdicts' fault_class. The ROLL-UP MATH that ranks/prioritizes/baselines the
+// fleet stays closed in the controlplane; only this projection crosses the wire.
+message AggregationEnvelope {
+  // Contract version string (matches the producing controlplane's proto major).
+  string contract_version = 1;
+
+  // Inclusive start of the aggregation window.
+  google.protobuf.Timestamp window_start = 2;
+
+  // Exclusive end of the aggregation window.
+  google.protobuf.Timestamp window_end = 3;
+
+  // The fleet-dimension-keyed open Verdicts. The cli renders one row each.
+  repeated FleetEntry entries = 4;
+
+  // Coarse fleet counts. These are pure sums over `entries[].verdict` (a reader
+  // could recompute them) — included only so the cli need not recount. They are
+  // NOT a closed aggregation: no baseline, ranking, or weighting is applied.
+  uint32 total_nodes = 5;
+  uint32 faulted_nodes = 6;
+  uint32 abstained_nodes = 7;
+}
