@@ -159,21 +159,25 @@ const (
 	GateSignature_GATE_SIGNATURE_POWER_THROTTLE GateSignature = 8
 	// PCIe/NVLink link degradation corroborated across sources.
 	GateSignature_GATE_SIGNATURE_LINK_DEGRADED GateSignature = 9
+	// Fatal Xid corroborated by an independent DCGM device-health failure
+	// (distinct from XID79 fallen-off-bus, which is its own signature above).
+	GateSignature_GATE_SIGNATURE_XID_FATAL GateSignature = 10
 )
 
 // Enum value maps for GateSignature.
 var (
 	GateSignature_name = map[int32]string{
-		0: "GATE_SIGNATURE_UNSPECIFIED",
-		1: "GATE_SIGNATURE_XID79_FALLEN_OFF_BUS",
-		2: "GATE_SIGNATURE_ECC_UNCORRECTABLE",
-		3: "GATE_SIGNATURE_NCCL_TIMEOUT",
-		4: "GATE_SIGNATURE_STRAGGLER",
-		5: "GATE_SIGNATURE_OOM_KILL",
-		6: "GATE_SIGNATURE_LOW_UTILIZATION",
-		7: "GATE_SIGNATURE_THERMAL_THROTTLE",
-		8: "GATE_SIGNATURE_POWER_THROTTLE",
-		9: "GATE_SIGNATURE_LINK_DEGRADED",
+		0:  "GATE_SIGNATURE_UNSPECIFIED",
+		1:  "GATE_SIGNATURE_XID79_FALLEN_OFF_BUS",
+		2:  "GATE_SIGNATURE_ECC_UNCORRECTABLE",
+		3:  "GATE_SIGNATURE_NCCL_TIMEOUT",
+		4:  "GATE_SIGNATURE_STRAGGLER",
+		5:  "GATE_SIGNATURE_OOM_KILL",
+		6:  "GATE_SIGNATURE_LOW_UTILIZATION",
+		7:  "GATE_SIGNATURE_THERMAL_THROTTLE",
+		8:  "GATE_SIGNATURE_POWER_THROTTLE",
+		9:  "GATE_SIGNATURE_LINK_DEGRADED",
+		10: "GATE_SIGNATURE_XID_FATAL",
 	}
 	GateSignature_value = map[string]int32{
 		"GATE_SIGNATURE_UNSPECIFIED":          0,
@@ -186,6 +190,7 @@ var (
 		"GATE_SIGNATURE_THERMAL_THROTTLE":     7,
 		"GATE_SIGNATURE_POWER_THROTTLE":       8,
 		"GATE_SIGNATURE_LINK_DEGRADED":        9,
+		"GATE_SIGNATURE_XID_FATAL":            10,
 	}
 )
 
@@ -544,7 +549,7 @@ const file_gpufleet_v1_verdict_proto_rawDesc = "" +
 	"\x1bFAULT_CLASS_LOW_UTILIZATION\x10\t\x12\x19\n" +
 	"\x15FAULT_CLASS_XID_FATAL\x10\n" +
 	"\x12\x1d\n" +
-	"\x19FAULT_CLASS_LINK_DEGRADED\x10\v\"\x04\b\f\x10\x1f*\xee\x02\n" +
+	"\x19FAULT_CLASS_LINK_DEGRADED\x10\v\"\x04\b\f\x10\x1f*\x8c\x03\n" +
 	"\rGateSignature\x12\x1e\n" +
 	"\x1aGATE_SIGNATURE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#GATE_SIGNATURE_XID79_FALLEN_OFF_BUS\x10\x01\x12$\n" +
@@ -555,8 +560,9 @@ const file_gpufleet_v1_verdict_proto_rawDesc = "" +
 	"\x1eGATE_SIGNATURE_LOW_UTILIZATION\x10\x06\x12#\n" +
 	"\x1fGATE_SIGNATURE_THERMAL_THROTTLE\x10\a\x12!\n" +
 	"\x1dGATE_SIGNATURE_POWER_THROTTLE\x10\b\x12 \n" +
-	"\x1cGATE_SIGNATURE_LINK_DEGRADED\x10\t\"\x04\b\n" +
-	"\x10?B\xb2\x01\n" +
+	"\x1cGATE_SIGNATURE_LINK_DEGRADED\x10\t\x12\x1c\n" +
+	"\x18GATE_SIGNATURE_XID_FATAL\x10\n" +
+	"\"\x04\b\v\x10?B\xb2\x01\n" +
 	"\x0fcom.gpufleet.v1B\fVerdictProtoP\x01ZDgithub.com/rocker-zhang/gpufleet-proto/gen/go/gpufleet/v1;gpufleetv1\xa2\x02\x03GXX\xaa\x02\vGpufleet.V1\xca\x02\vGpufleet\\V1\xe2\x02\x17Gpufleet\\V1\\GPBMetadata\xea\x02\fGpufleet::V1b\x06proto3"
 
 var (

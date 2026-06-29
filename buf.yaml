@@ -13,3 +13,8 @@ breaking:
     - FILE
   except:
     - EXTENSION_NO_DELETE
+    # The GateSignature / FaultClass enums keep a forward pool of reserved
+    # numbers (e.g. `reserved 10 to 63`) that new deterministic signatures draw
+    # from as they are added. Assigning a self-reserved number is wire-safe — it
+    # never carried a prior meaning — so allow the reserved range to shrink.
+    - RESERVED_ENUM_NO_DELETE
