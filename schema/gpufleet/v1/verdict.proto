@@ -103,10 +103,14 @@ enum GateSignature {
   // PCIe/NVLink link degradation corroborated across sources.
   GATE_SIGNATURE_LINK_DEGRADED = 9;
 
+  // Fatal Xid corroborated by an independent DCGM device-health failure
+  // (distinct from XID79 fallen-off-bus, which is its own signature above).
+  GATE_SIGNATURE_XID_FATAL = 10;
+
   // Reserved for future deterministic signatures. DO NOT reuse these numbers
   // for unrelated meanings; that would be a wire-breaking change. New rules
   // append a new value at the END (additive minor tag), never renumber.
-  reserved 10 to 63;
+  reserved 11 to 63;
 }
 
 // CitedSignal is a verifiable reference back into the EvidencePack timeline.
